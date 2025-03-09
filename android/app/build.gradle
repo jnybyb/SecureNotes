@@ -111,6 +111,16 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Biometric authentication support
+    implementation("androidx.biometric:biometric:1.1.0")
+    
+    // Add Keychain implementation
+    implementation project(':react-native-keychain')
+    
+    // Add AES Crypto implementation
+    implementation project(':react-native-aes-crypto')
+
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

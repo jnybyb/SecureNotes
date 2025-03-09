@@ -4,3 +4,21 @@ extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autoli
 rootProject.name = 'SecureNotes'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+
+// Add SQLite Storage configuration
+include ':react-native-sqlite-storage'
+project(':react-native-sqlite-storage').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-sqlite-storage/platforms/android')
+
+// Add AES Crypto configuration
+include ':react-native-aes-crypto'
+project(':react-native-aes-crypto').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-aes-crypto/android')
+
+// Add Biometric configuration
+include ':react-native-biometric'
+project(':react-native-biometric').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-biometric/android')
+
+// Add Keychain configuration
+include ':react-native-keychain'
+project(':react-native-keychain').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-keychain/android')
+

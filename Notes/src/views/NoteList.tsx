@@ -12,11 +12,14 @@ import {
 import NotePresenter from '../presenters/NotePresenter';
 import { Note } from '../models/Note';
 import AddNoteScreen from './AddNewNote';
+import SecurityScreen from './SecurityScreen'; // Import SecurityScreen
 
 const NoteList: React.FC = () => {
     const [notes, setNotes] = useState<Note[]>([]);
     const [addScreenVisible, setAddScreenVisible] = useState(false);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+    const [securityScreenVisible, setSecurityScreenVisible] = useState(false);
+    const [pendingAction, setPendingAction] = useState<{ type: 'view' | 'delete', note: Note | null }>({ type: 'view', note: null });
     
     const [presenter] = useState(() => new NotePresenter({
         onNotesLoaded: setNotes,
@@ -30,12 +33,19 @@ const NoteList: React.FC = () => {
     }, [presenter]);
 
     const handleNotePress = (note: Note) => {
-        // Directly open the note without authentication
-        setSelectedNote(note);
-        setAddScreenVisible(true);
+        // Set the pending action to view the note
+        setPendingAction({ type: 'view', note });
+        
+        // Show authentication screen
+        setSecurityScreenVisible(true);
     };
 
     const handleDeleteNote = async (id: number) => {
+        // Find the note by id
+        const noteToDelete = notes.find(note => note.id === id);
+        
+        if (!noteToDelete) return;
+        
         // First confirm if the user wants to delete the note
         Alert.alert(
             'Delete Note',
@@ -46,8 +56,11 @@ const NoteList: React.FC = () => {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: () => {
-                        // Directly delete the note without authentication
-                        presenter.deleteNote(id);
+                        // Set pending action to delete the note
+                        setPendingAction({ type: 'delete', note: noteToDelete });
+                        
+                        // Show authentication screen
+                        setSecurityScreenVisible(true);
                     }
                 }
             ]
@@ -55,9 +68,27 @@ const NoteList: React.FC = () => {
     };
 
     const handleAddNewNote = () => {
-        // Directly open a new note screen without authentication
+        // For adding new notes, we don't need authentication
         setSelectedNote(null);
         setAddScreenVisible(true);
+    };
+
+    const handleAuthenticated = () => {
+        // Hide security screen
+        setSecurityScreenVisible(false);
+        
+        // Process the pending action after authentication
+        if (pendingAction.type === 'view' && pendingAction.note) {
+            // Open the note for viewing/editing
+            setSelectedNote(pendingAction.note);
+            setAddScreenVisible(true);
+        } else if (pendingAction.type === 'delete' && pendingAction.note && pendingAction.note.id) {
+            // Delete the note
+            presenter.deleteNote(pendingAction.note.id);
+        }
+        
+        // Clear the pending action
+        setPendingAction({ type: 'view', note: null });
     };
 
     const formatDate = (dateString: string) => {
@@ -99,7 +130,7 @@ const NoteList: React.FC = () => {
                     <TouchableOpacity
                         style={styles.noteItem}
                         onPress={() => handleNotePress(item)}
-                        onLongPress={() => handleDeleteNote(item.id!)}
+                        onLongPress={() => item.id && handleDeleteNote(item.id)}
                     >
                         <Text style={styles.noteTitle}>{item.title}</Text>
                         <Text style={styles.noteDate}>
@@ -120,6 +151,16 @@ const NoteList: React.FC = () => {
                 />
             </TouchableOpacity>
 
+            {/* Security Screen Modal */}
+            <Modal
+                visible={securityScreenVisible}
+                animationType="slide"
+                transparent={false}
+            >
+                <SecurityScreen onAuthenticated={handleAuthenticated} />
+            </Modal>
+
+            {/* Add/Edit Note Screen */}
             <AddNoteScreen
                 visible={addScreenVisible}
                 onClose={() => {

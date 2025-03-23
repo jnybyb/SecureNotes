@@ -23,6 +23,8 @@ interface AddNoteScreenProps {
 const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, onSave }) => {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [originalTitle, setOriginalTitle] = useState('');
+    const [originalContent, setOriginalContent] = useState('');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [currentDateTime, setCurrentDateTime] = useState('');
     const slideAnim = React.useRef(new Animated.Value(Dimensions.get('window').width)).current;
@@ -34,12 +36,19 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
         if (visible) {
             // If a note is provided, we're in edit mode
             if (note) {
+                // Set current values
                 setTitle(note.title);
                 setContent(note.content);
+                
+                // Store original values to detect changes
+                setOriginalTitle(note.title);
+                setOriginalContent(note.content);
             } else {
                 // Clear fields when opening for a new note
                 setTitle('');
                 setContent('');
+                setOriginalTitle('');
+                setOriginalContent('');
             }
             updateDateTime();
             slideIn();
@@ -47,6 +56,17 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
             slideOut();
         }
     }, [visible, note]);
+
+    // Check if content has been modified
+    const hasChanges = () => {
+        if (note) {
+            // For existing notes, compare with original values
+            return title !== originalTitle || content !== originalContent;
+        } else {
+            // For new notes, check if fields are not empty
+            return title.trim() !== '' || content.trim() !== '';
+        }
+    };
 
     const updateDateTime = () => {
         const now = new Date();
@@ -77,9 +97,11 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
     };
 
     const handleClose = () => {
-        if (title.trim() || content.trim()) {
+        // Only show confirm modal if changes were made
+        if (hasChanges()) {
             setShowConfirmModal(true);
         } else {
+            // No changes, just close immediately
             resetAndClose();
         }
     };

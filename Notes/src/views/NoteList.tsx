@@ -8,20 +8,14 @@ import {
     Alert,
     Image,
     Modal,
-    TextInput,
 } from 'react-native';
 import NotePresenter from '../presenters/NotePresenter';
 import { Note } from '../models/Note';
 import AddNoteScreen from './AddNewNote';
-import { AuthenticationService } from '../services/AuthenticationService';
-import SecurityScreen from './SecurityScreen';
 
 const NoteList: React.FC = () => {
     const [notes, setNotes] = useState<Note[]>([]);
     const [addScreenVisible, setAddScreenVisible] = useState(false);
-    const [showSecurityScreen, setShowSecurityScreen] = useState(false);
-    const [pendingDeleteNoteId, setPendingDeleteNoteId] = useState<number | null>(null);
-    const [pendingViewNoteId, setPendingViewNoteId] = useState<number | null>(null);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     
     const [presenter] = useState(() => new NotePresenter({
@@ -31,24 +25,14 @@ const NoteList: React.FC = () => {
     }));
 
     useEffect(() => {
-        authenticateAndLoadNotes();
+        // Load notes directly without authentication
+        presenter.loadNotes();
     }, [presenter]);
 
-    const authenticateAndLoadNotes = async () => {
-        const authenticated = await AuthenticationService.authenticate();
-        if (authenticated) {
-            presenter.loadNotes();
-        } else {
-            // This is for initial app load - you might want to handle differently
-            setShowSecurityScreen(true);
-        }
-    };
-
     const handleNotePress = (note: Note) => {
-        // Set the pending note to view and require authentication
-        setPendingViewNoteId(note.id!);
-        setSelectedNote(null); // Clear any previously selected note
-        setShowSecurityScreen(true);
+        // Directly open the note without authentication
+        setSelectedNote(note);
+        setAddScreenVisible(true);
     };
 
     const handleDeleteNote = async (id: number) => {
@@ -62,9 +46,8 @@ const NoteList: React.FC = () => {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: () => {
-                        // Store the ID and show security screen for authentication
-                        setPendingDeleteNoteId(id);
-                        setShowSecurityScreen(true);
+                        // Directly delete the note without authentication
+                        presenter.deleteNote(id);
                     }
                 }
             ]
@@ -72,37 +55,9 @@ const NoteList: React.FC = () => {
     };
 
     const handleAddNewNote = () => {
-        // Set up for a new note, require authentication first
+        // Directly open a new note screen without authentication
         setSelectedNote(null);
-        setShowSecurityScreen(true);
-    };
-
-    const handleAuthenticated = () => {
-        // User has been authenticated, proceed with operation
-        setShowSecurityScreen(false);
-        
-        if (pendingDeleteNoteId !== null) {
-            // Handle delete operation
-            presenter.deleteNote(pendingDeleteNoteId);
-            setPendingDeleteNoteId(null);
-        } else if (pendingViewNoteId !== null) {
-            // Handle view operation - find the note and display it
-            const noteToView = notes.find(note => note.id === pendingViewNoteId);
-            if (noteToView) {
-                setSelectedNote(noteToView);
-                setAddScreenVisible(true);
-            }
-            setPendingViewNoteId(null);
-        } else {
-            // If no pending operations, it means we're authenticating for initial load
-            // or for adding a new note
-            presenter.loadNotes();
-            
-            // If we intended to add a new note, open the screen
-            if (selectedNote === null && !pendingDeleteNoteId && !pendingViewNoteId) {
-                setAddScreenVisible(true);
-            }
-        }
+        setAddScreenVisible(true);
     };
 
     const formatDate = (dateString: string) => {
@@ -181,21 +136,12 @@ const NoteList: React.FC = () => {
                             // Otherwise, we're adding a new note
                             await presenter.addNote(title, content);
                         }
-                        setAddScreenVisible(false);
-                        setSelectedNote(null);
+                        // AddNoteScreen will handle showing the success message and closing
                     } catch {
                         Alert.alert('Error', 'Failed to save note');
                     }
                 }}
             />
-
-            <Modal
-                visible={showSecurityScreen}
-                animationType="fade"
-                transparent={false}
-            >
-                <SecurityScreen onAuthenticated={handleAuthenticated} />
-            </Modal>
         </View>
     );
 };
@@ -254,6 +200,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#2c3e50',
         marginBottom: 8,
+        includeFontPadding: false,
     },
     noteDate: {
         fontSize: 12,
@@ -262,7 +209,7 @@ const styles = StyleSheet.create({
     },
     addButton: {
         position: 'absolute',
-        right: 30,
+        right: 25,
         bottom: 40,
         width: 70,
         height: 70,
@@ -275,44 +222,6 @@ const styles = StyleSheet.create({
         width: 20,
         height: 20,
         tintColor: '#fff',
-    },
-    modalContainer: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        width: '80%',
-        alignItems: 'center',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 20,
-    },
-    pinInput: {
-        width: '100%',
-        height: 40,
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        paddingHorizontal: 10,
-        marginBottom: 20,
-    },
-    submitButton: {
-        backgroundColor: '#000',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 5,
-    },
-    submitButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
     },
 });
 

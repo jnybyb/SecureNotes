@@ -104,18 +104,32 @@ class DatabaseService {
 
     public static async updateNote(id: number, title: string, content: string): Promise<void> {
         try {
+            console.log(`DatabaseService updating note ID: ${id}`);
             const db = await this.getDatabaseInstance();
             const now = new Date().toISOString();
-            await db.executeAsync(
+            
+            // Log the SQL and parameters for debugging
+            console.log('Update SQL:', 'UPDATE notes SET title = ?, content = ?, updated_at = ? WHERE id = ?');
+            console.log('Parameters:', [title, content, now, id]);
+            
+            const result = await db.executeAsync(
                 'UPDATE notes SET title = ?, content = ?, updated_at = ? WHERE id = ?',
                 [title, content, now, id]
             );
-            console.log('Note updated successfully');
+            
+            // Check if any rows were actually updated
+            console.log('Update result:', result);
+            if (result && result.rowsAffected === 0) {
+                console.warn('No rows were updated. Note might not exist with ID:', id);
+            } else {
+                console.log(`Note ID ${id} updated successfully`);
+            }
         } catch (error) {
             console.error('Error updating note:', error);
             throw error;
         }
     }
+    
     public static async closeDatabase(): Promise<void> {
         if (this.dbInstance) {
             try {

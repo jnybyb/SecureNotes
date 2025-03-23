@@ -11,8 +11,6 @@ import {
     Modal,
     Alert,
 } from 'react-native';
-import { AuthenticationService } from '../services/AuthenticationService';
-import SecurityScreen from './SecurityScreen';
 import { Note } from '../models/Note';
 
 interface AddNoteScreenProps {
@@ -30,7 +28,7 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
     const slideAnim = React.useRef(new Animated.Value(Dimensions.get('window').width)).current;
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    const [showSecurityScreen, setShowSecurityScreen] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
  
     useEffect(() => {
         if (visible) {
@@ -110,20 +108,22 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
             return;
         }
         
-        // Instead of directly saving, show the security screen
-        setShowSecurityScreen(true);
-    };
-
-    // This will be called after successful authentication
-    const handleAuthenticationSuccess = () => {
-        setShowSecurityScreen(false);
+        // Directly proceed to save without security screen
         handleSave();
     };
 
     const handleSave = async () => {
         // Pass the noteId if we're editing an existing note
         onSave(title, content, note?.id);
-        resetAndClose();
+        
+        // Show success modal
+        setShowSuccessModal(true);
+        
+        // Auto-close success modal after 1.5 seconds
+        setTimeout(() => {
+            setShowSuccessModal(false);
+            resetAndClose();
+        }, 1500);
     };
 
     const handleError = (message: string) => {
@@ -162,16 +162,25 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
         </Modal>
     );
 
-    // Render the SecurityScreen in a modal
-    const renderSecurityScreen = () => (
+    // Success Modal
+    const renderSuccessModal = () => (
         <Modal
-            visible={showSecurityScreen}
-            transparent={false}
-            animationType="slide"
+            visible={showSuccessModal}
+            transparent={true}
+            animationType="fade"
         >
-            <SecurityScreen 
-                onAuthenticated={handleAuthenticationSuccess} 
-            />
+            <View style={styles.modalContainer}>
+                <View style={styles.successModalContent}>
+                    <View style={styles.successIconContainer}>
+                        <Image 
+                            source={require('../assets/icons/save.png')}
+                            style={styles.successIcon}
+                            resizeMode="contain"
+                        />
+                    </View>
+                    <Text style={styles.successModalTitle}>Note Saved Successfully</Text>
+                </View>
+            </View>
         </Modal>
     );
 
@@ -200,7 +209,6 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
                         style={[
                             styles.iconButton
                         ]}
-                        // Removed disabled property to ensure it's always clickable
                     >
                         <Image 
                             source={require('../assets/icons/save.png')}
@@ -271,9 +279,9 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
                                     ]}
                                     onPress={() => {
                                         if (title.trim() && content.trim()) {
-                                            // Instead of directly saving, show the security screen
+                                            // Directly save without security screen
                                             setShowConfirmModal(false);
-                                            setShowSecurityScreen(true);
+                                            handleSave();
                                         } else {
                                             // Show error if user tries to save incomplete note from this modal
                                             let errorMsg = '';
@@ -288,7 +296,6 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
                                             handleError(errorMsg);
                                         }
                                     }}
-                                    // Removed disabled property to ensure it's always clickable
                                 >
                                     <Text 
                                         style={[
@@ -304,7 +311,7 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, o
                 </Modal>
 
                 {renderErrorModal()}
-                {renderSecurityScreen()}
+                {renderSuccessModal()}
             </Animated.View>
         </>
     );
@@ -408,10 +415,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         position: 'relative',
     },
+    successModalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+        width: '70%',
+        alignItems: 'center',
+        position: 'relative',
+    },
     modalTitle: {
         fontSize: 22,
         fontWeight: '600',
         color: '#000',
+        includeFontPadding: false,
+    },
+    successModalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#000',
+        marginTop: 10,
         includeFontPadding: false,
     },
     modalMessage: {
@@ -442,14 +464,6 @@ const styles = StyleSheet.create({
         borderColor: '#000',
     },
     saveButton: {
-        backgroundColor: '#000',
-    },
-    cancelSaveButton: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#000',
-    },
-    confirmSaveButton: {
         backgroundColor: '#000',
     },
     disabledButton: {
@@ -489,107 +503,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 14,
     },
-    alertTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#000',
-        textAlign: 'center',
-        marginBottom: 10,
-    },
-    alertMessage: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-    },
-    singleButton: {
-        backgroundColor: '#000',
-        width: '100%',
-    },
-    errorModalButtons: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        width: '100%',
-    },
-    disabledIconButton: {
-        borderColor: '#ccc',
-    },
-    disabledIcon: {
-        opacity: 0.5,
-    },
-    warningModalContent: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 24,
-        width: '85%',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#000',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 5,
-    },
-    warningModalTitle: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#000',
-        marginBottom: 16,
-        textAlign: 'center',
-        includeFontPadding: false,
-    },
-    warningModalMessage: {
-        fontSize: 16,
-        color: '#000',
-        marginBottom: 24,
-        textAlign: 'center',
-        lineHeight: 22,
-    },
-    warningModalButton: {
-        backgroundColor: '#000',
-        paddingVertical: 12,
-        paddingHorizontal: 32,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    warningModalButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#fff',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-        width: '100%',
-        marginTop: 10,
-    },
-    saveModalContent: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        width: '80%',
-        alignItems: 'center',
-        position: 'relative',
-        paddingTop: 30,
-    },
-    saveModalIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#000',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    saveModalIcon: {
-        width: 20,
-        height: 20,
-        tintColor: '#fff',
-    },
-    // New styles for centered header and small OK button
     centeredModalHeader: {
         width: '100%',
         alignItems: 'center',
@@ -611,6 +524,19 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#000',
+    },
+    successIconContainer: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    successIcon: {
+        width: 25,
+        height: 25,
+        tintColor: '#fff',
     }
 });
 

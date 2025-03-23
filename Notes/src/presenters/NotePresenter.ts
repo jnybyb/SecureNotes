@@ -42,10 +42,22 @@ class NotePresenter {
     }
 
     public async updateNote(id: number, title: string, content: string): Promise<void> {
+        console.log(`Starting update for note ID: ${id}`);
+        console.log(`Title: "${title}", Content length: ${content.length}`);
+        
         try {
+            // Make sure id is a number
+            if (typeof id !== 'number' || isNaN(id)) {
+                console.error('Invalid ID:', id);
+                this.callbacks.onError('Failed to update note: Invalid ID');
+                return;
+            }
+            
             await DatabaseService.updateNote(id, title, content);
+            console.log('Database update successful, reloading notes...');
             await this.loadNotes(); // Reload notes after update
         } catch (error) {
+            console.error('Update error:', error);
             this.callbacks.onError('Failed to update note');
         }
     }

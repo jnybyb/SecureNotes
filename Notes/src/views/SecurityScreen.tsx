@@ -6,34 +6,81 @@ import AsyncStorage from '@react-native-async-storage/async-storage'; // Import 
 
 interface SecurityScreenProps {
   onAuthenticated: () => void;
+  mode?: 'delete' | 'normal';  // Add new prop for different modes
 }
 
-const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
+const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated, mode = 'normal' }) => {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [setupMode, setSetupMode] = useState<'initial' | 'confirm' | 'normal'>('normal');
   const [biometricPrompted, setBiometricPrompted] = useState(false);
+  const [showBiometricButton, setShowBiometricButton] = useState(false);
+  const [authStatus, setAuthStatus] = useState<string>('');
+  const [isBiometricEnabled, setIsBiometricEnabled] = useState<boolean>(false);
 
   useEffect(() => {
-    checkFirstTimeSetup();
-  }, []);
+    initializeSecurityCheck();
+  }, [mode]);
 
-  const checkFirstTimeSetup = async () => {
+  const initializeSecurityCheck = async () => {
     try {
       const credentials = await Keychain.getGenericPassword({ service: 'secure_notes_pin' });
-      const biometricPreference = await AsyncStorage.getItem('biometricEnabled'); // Check stored preference
+      const biometricPreference = await AsyncStorage.getItem('biometricEnabled');
 
       if (!credentials) {
+        // First time launch
         setSetupMode('initial');
+        setShowBiometricButton(false);
       } else {
+        // Subsequent launches
         setSetupMode('normal');
-        if (!biometricPrompted && biometricPreference === 'true') {
-          promptBiometricAuth();
+        setIsBiometricEnabled(biometricPreference === 'true');
+        
+        if (biometricPreference === 'true') {
+          // User chose biometric
+          setShowBiometricButton(false);
+          startBiometricListener();
+        } else {
+          // User chose PIN
+          setShowBiometricButton(true);
         }
       }
     } catch (error) {
-      console.error('Error checking keychain:', error);
+      console.error('Error checking security settings:', error);
       setSetupMode('initial');
+    }
+  };
+
+  const startBiometricListener = async () => {
+    const rnBiometrics = new ReactNativeBiometrics();
+    try {
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+      
+      if (available && biometryType) {
+        setAuthStatus('Authenticating...');
+        
+        const { success } = await rnBiometrics.simplePrompt({
+          promptMessage: 'Authenticate with fingerprint',
+          cancelButtonText: 'Use PIN instead',
+          fallbackPromptMessage: 'Use PIN instead',
+        });
+
+        if (success) {
+          setAuthStatus('Authentication successful');
+          setTimeout(() => {
+            onAuthenticated();
+          }, 500);
+        } else {
+          // User wants to use PIN temporarily
+          setAuthStatus('');
+          // Show "Use Biometric" since biometric is already enabled
+          setShowBiometricButton(true);
+        }
+      }
+    } catch (error) {
+      console.error('Biometric authentication error:', error);
+      setAuthStatus('');
+      setShowBiometricButton(true);
     }
   };
 
@@ -73,7 +120,9 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
         {
           text: 'No',
           onPress: async () => {
-            await AsyncStorage.setItem('biometricEnabled', 'false'); // Store preference
+            await AsyncStorage.setItem('biometricEnabled', 'false');
+            setShowBiometricButton(true);
+            setIsBiometricEnabled(false);
             resetToEnterPin();
           },
           style: 'cancel',
@@ -83,8 +132,10 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
           onPress: async () => {
             const success = await promptBiometricAuth();
             if (success) {
-              await AsyncStorage.setItem('biometricEnabled', 'true'); // Store preference
-              resetToEnterPin(); // Redirect to normal Security Screen
+              await AsyncStorage.setItem('biometricEnabled', 'true');
+              setShowBiometricButton(false);
+              setIsBiometricEnabled(true);
+              resetToEnterPin();
             }
           },
         },
@@ -99,6 +150,7 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
       const { available, biometryType } = await rnBiometrics.isSensorAvailable();
 
       if (available && biometryType) {
+        setAuthStatus('Authenticating...');
         const { success } = await rnBiometrics.simplePrompt({
           promptMessage: 'Authenticate with Biometrics',
           cancelButtonText: 'Cancel',
@@ -106,19 +158,24 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
 
         if (success) {
           setBiometricPrompted(true);
-          onAuthenticated(); // Authenticate the user
-          return true; // Return success
+          setAuthStatus('App Starting...');
+          setTimeout(() => {
+            onAuthenticated();
+          }, 1000); // Give time to show "App Starting" message
+          return true;
         } else {
-            return false; // Return failure
+          setAuthStatus('');
+          return false;
         }
       } else {
         Alert.alert('Biometric Authentication Not Available', 'Biometric authentication is not supported on this device.');
-        return false; // Return failure
+        return false;
       }
     } catch (error) {
       console.error('Biometric authentication error:', error);
       Alert.alert('Error', 'An error occurred while trying to authenticate.');
-      return false; // Return failure
+      setAuthStatus('');
+      return false;
     }
   };
 
@@ -175,10 +232,34 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
     }
   };
 
+  const handleBiometricButtonPress = () => {
+    if (isBiometricEnabled) {
+      // If biometric is already enabled, directly start the biometric listener
+      startBiometricListener();
+    } else {
+      // If biometric is not enabled, show the setup modal
+      askForBiometricSetup();
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Image source={require('../assets/icons/NoteLogo.png')} style={styles.logo} />
-      <Text style={styles.title}>Notes</Text>
+      <View style={styles.headerContainer}>
+        <Image source={require('../assets/icons/NoteLogo.png')} style={styles.logo} />
+        <Text style={styles.title}>Notes</Text>
+        <Image source={require('../assets/icons/fingerprint.png')} style={styles.fingerprintIcon} />
+        {authStatus ? (
+          <Text style={styles.authStatus}>{authStatus}</Text>
+        ) : (
+          showBiometricButton && mode === 'normal' && (
+            <TouchableOpacity onPress={handleBiometricButtonPress}>
+              <Text style={styles.biometricsText}>
+                {isBiometricEnabled ? 'Use Biometric' : 'Enable Biometric'}
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
+      </View>
 
       <View style={styles.contentContainer}>
         <Text style={styles.prompt}>
@@ -232,19 +313,65 @@ const SecurityScreen: React.FC<SecurityScreenProps> = ({ onAuthenticated }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
-  contentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  logo: { width: 55, height: 55, marginTop: 100, alignSelf: 'center' },
-  title: { fontSize: 20, fontWeight: 'bold', marginTop: 10, marginBottom: 10, alignSelf: 'center' },
-  prompt: { fontSize: 17, marginBottom: 25 },
-  pinContainer: { flexDirection: 'row', marginBottom: 40 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#fff',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  contentContainer: { 
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  logo: { 
+    width: 55, 
+    height: 55,
+  },
+  title: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginTop: 10,
+  },
+  fingerprintIcon: { 
+    width: 40, 
+    height: 40, 
+    marginTop: 40,
+  },
+  prompt: { 
+    fontSize: 17, 
+    marginBottom: 20
+  },
+  pinContainer: { 
+    flexDirection: 'row', 
+    marginBottom: 30
+  },
   pinCircle: { width: 10, height: 10, borderRadius: 7.5, borderWidth: 1, borderColor: '#333', marginHorizontal: 5 },
   filledPinCircle: { backgroundColor: '#000' },
-  numpad: { width: '100%', paddingBottom: 10, backgroundColor: '#fff' },
-  numpadRow: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20, marginBottom: 2 },
+  numpad: { 
+    width: '100%', 
+    paddingBottom: 20,
+    backgroundColor: '#fff' 
+  },
+  numpadRow: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 10, marginBottom: 2 },
   numButton: { width: 75, height: 75, justifyContent: 'center', alignItems: 'center', borderRadius: 37.5 },
   numText: { fontSize: 24, color: '#000' },
   deleteIcon: { width: 38, height: 38 },
+  biometricsText: {
+    fontSize: 15,
+    color: '#007AFF',
+    marginTop: 10,
+  },
+  authStatus: {
+    fontSize: 15,
+    color: '#007AFF',
+    marginTop: 10,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
 });
 
 export default SecurityScreen;

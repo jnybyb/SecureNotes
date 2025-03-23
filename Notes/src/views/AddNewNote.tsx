@@ -559,6 +559,8 @@ const styles = StyleSheet.create({
         width: 25,
         height: 25,
         tintColor: '#fff',
+        marginTop: 10,
+        marginBottom: 10,
     }
 });
 

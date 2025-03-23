@@ -22,18 +22,29 @@ function App(): React.JSX.Element {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'none' // This replaces animationEnabled
+        }}
+      >
         {isLoading ? (
           <Stack.Screen
             name="Loading"
             children={() => <LoadingScreen onAnimationComplete={handleAnimationComplete} />}
           />
         ) : isAuthenticated ? (
-          <Stack.Screen name="NoteList" component={NoteList} />
+          <Stack.Screen 
+            name="NoteList" 
+            component={NoteList}
+           // options={{ animation: 'slide_from_right' }} // This replaces animationEnabled
+          />
         ) : (
           <Stack.Screen
             name="Security"
             children={() => <SecurityScreen onAuthenticated={handleAuthenticated} />}
+            //options={{ animation: 'slide_from_right' }} // This replaces animationEnabled
           />
         )}
       </Stack.Navigator>

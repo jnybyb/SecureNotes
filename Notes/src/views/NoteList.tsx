@@ -41,12 +41,10 @@ const NoteList: React.FC = () => {
     };
 
     const handleDeleteNote = async (id: number) => {
-        // Find the note by id
         const noteToDelete = notes.find(note => note.id === id);
         
         if (!noteToDelete) return;
         
-        // First confirm if the user wants to delete the note
         Alert.alert(
             'Delete Note',
             'Are you sure you want to delete this note?',
@@ -55,11 +53,8 @@ const NoteList: React.FC = () => {
                 { 
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => {
-                        // Set pending action to delete the note
+                    onPress: async () => {
                         setPendingAction({ type: 'delete', note: noteToDelete });
-                        
-                        // Show authentication screen
                         setSecurityScreenVisible(true);
                     }
                 }
@@ -157,7 +152,10 @@ const NoteList: React.FC = () => {
                 animationType="slide"
                 transparent={false}
             >
-                <SecurityScreen onAuthenticated={handleAuthenticated} />
+                <SecurityScreen 
+                    onAuthenticated={handleAuthenticated} 
+                    mode={pendingAction.type === 'delete' ? 'delete' : 'normal'}
+                />
             </Modal>
 
             {/* Add/Edit Note Screen */}

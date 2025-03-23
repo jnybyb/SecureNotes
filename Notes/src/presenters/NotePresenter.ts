@@ -40,6 +40,15 @@ class NotePresenter {
             this.callbacks.onError('Failed to delete note');
         }
     }
+
+    public async updateNote(id: number, title: string, content: string): Promise<void> {
+        try {
+            await DatabaseService.updateNote(id, title, content);
+            await this.loadNotes(); // Reload notes after update
+        } catch (error) {
+            this.callbacks.onError('Failed to update note');
+        }
+    }
 }
 
 export default NotePresenter;

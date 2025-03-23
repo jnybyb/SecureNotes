@@ -102,6 +102,20 @@ class DatabaseService {
         }
     }
 
+    public static async updateNote(id: number, title: string, content: string): Promise<void> {
+        try {
+            const db = await this.getDatabaseInstance();
+            const now = new Date().toISOString();
+            await db.executeAsync(
+                'UPDATE notes SET title = ?, content = ?, updated_at = ? WHERE id = ?',
+                [title, content, now, id]
+            );
+            console.log('Note updated successfully');
+        } catch (error) {
+            console.error('Error updating note:', error);
+            throw error;
+        }
+    }
     public static async closeDatabase(): Promise<void> {
         if (this.dbInstance) {
             try {

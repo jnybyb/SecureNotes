@@ -12,14 +12,17 @@ import {
     Alert,
 } from 'react-native';
 import { AuthenticationService } from '../services/AuthenticationService';
+import SecurityScreen from './SecurityScreen';
+import { Note } from '../models/Note';
 
 interface AddNoteScreenProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (title: string, content: string) => void;
+    note?: Note | null;
+    onSave: (title: string, content: string, noteId?: number) => void;
 }
 
-const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave }) => {
+const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, note, onSave }) => {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -27,16 +30,25 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
     const slideAnim = React.useRef(new Animated.Value(Dimensions.get('window').width)).current;
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [showSecurityScreen, setShowSecurityScreen] = useState(false);
  
-
     useEffect(() => {
         if (visible) {
+            // If a note is provided, we're in edit mode
+            if (note) {
+                setTitle(note.title);
+                setContent(note.content);
+            } else {
+                // Clear fields when opening for a new note
+                setTitle('');
+                setContent('');
+            }
             updateDateTime();
             slideIn();
         } else {
             slideOut();
         }
-    }, [visible]);
+    }, [visible, note]);
 
     const updateDateTime = () => {
         const now = new Date();
@@ -98,12 +110,19 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
             return;
         }
         
-        // If validation passes, proceed to save the note
+        // Instead of directly saving, show the security screen
+        setShowSecurityScreen(true);
+    };
+
+    // This will be called after successful authentication
+    const handleAuthenticationSuccess = () => {
+        setShowSecurityScreen(false);
         handleSave();
     };
 
     const handleSave = async () => {
-        onSave(title, content);
+        // Pass the noteId if we're editing an existing note
+        onSave(title, content, note?.id);
         resetAndClose();
     };
 
@@ -143,6 +162,19 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
         </Modal>
     );
 
+    // Render the SecurityScreen in a modal
+    const renderSecurityScreen = () => (
+        <Modal
+            visible={showSecurityScreen}
+            transparent={false}
+            animationType="slide"
+        >
+            <SecurityScreen 
+                onAuthenticated={handleAuthenticationSuccess} 
+            />
+        </Modal>
+    );
+
     return (
         <>
             <Animated.View 
@@ -162,7 +194,7 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
                             resizeMode="contain"
                         />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Add Note</Text>
+                    <Text style={styles.headerTitle}>{note ? 'Edit Note' : 'Add Note'}</Text>
                     <TouchableOpacity 
                         onPress={handleSaveClick} 
                         style={[
@@ -239,7 +271,9 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
                                     ]}
                                     onPress={() => {
                                         if (title.trim() && content.trim()) {
-                                            handleSave();
+                                            // Instead of directly saving, show the security screen
+                                            setShowConfirmModal(false);
+                                            setShowSecurityScreen(true);
                                         } else {
                                             // Show error if user tries to save incomplete note from this modal
                                             let errorMsg = '';
@@ -258,7 +292,7 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
                                 >
                                     <Text 
                                         style={[
-                                            styles.okButton, 
+                                            styles.saveText, 
                                         ]}
                                     >
                                         Save
@@ -270,6 +304,7 @@ const AddNoteScreen: React.FC<AddNoteScreenProps> = ({ visible, onClose, onSave 
                 </Modal>
 
                 {renderErrorModal()}
+                {renderSecurityScreen()}
             </Animated.View>
         </>
     );
@@ -427,10 +462,8 @@ const styles = StyleSheet.create({
         color: '#000',
         includeFontPadding: false,
     },
-    okButton: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#000',
+    saveText: {
+        color: '#fff',
     },
     modalHeaderAligned: {
         flexDirection: 'row',

@@ -14,16 +14,15 @@ import NotePresenter from '../presenters/NotePresenter';
 import { Note } from '../models/Note';
 import AddNoteScreen from './AddNewNote';
 import { AuthenticationService } from '../services/AuthenticationService';
+import SecurityScreen from './SecurityScreen';
 
 const NoteList: React.FC = () => {
     const [notes, setNotes] = useState<Note[]>([]);
     const [addScreenVisible, setAddScreenVisible] = useState(false);
-    const [showPinModal, setShowPinModal] = useState(false);
-    const [pin, setPin] = useState('');
-    const [pendingAction, setPendingAction] = useState<{
-        type: 'delete' | 'load';
-        id?: number;
-    } | null>(null);
+    const [showSecurityScreen, setShowSecurityScreen] = useState(false);
+    const [pendingDeleteNoteId, setPendingDeleteNoteId] = useState<number | null>(null);
+    const [pendingViewNoteId, setPendingViewNoteId] = useState<number | null>(null);
+    const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     
     const [presenter] = useState(() => new NotePresenter({
         onNotesLoaded: setNotes,
@@ -40,16 +39,20 @@ const NoteList: React.FC = () => {
         if (authenticated) {
             presenter.loadNotes();
         } else {
-            setPendingAction({ type: 'load' });
-            setShowPinModal(true);
+            // This is for initial app load - you might want to handle differently
+            setShowSecurityScreen(true);
         }
     };
 
-    const handleDeleteNote = async (id: number) => {
-        confirmDelete(id);
+    const handleNotePress = (note: Note) => {
+        // Set the pending note to view and require authentication
+        setPendingViewNoteId(note.id!);
+        setSelectedNote(null); // Clear any previously selected note
+        setShowSecurityScreen(true);
     };
 
-    const confirmDelete = (id: number) => {
+    const handleDeleteNote = async (id: number) => {
+        // First confirm if the user wants to delete the note
         Alert.alert(
             'Delete Note',
             'Are you sure you want to delete this note?',
@@ -58,26 +61,47 @@ const NoteList: React.FC = () => {
                 { 
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => presenter.deleteNote(id),
+                    onPress: () => {
+                        // Store the ID and show security screen for authentication
+                        setPendingDeleteNoteId(id);
+                        setShowSecurityScreen(true);
+                    }
                 }
             ]
         );
     };
 
-    const handlePinSubmit = async () => {
-        const isValid = await AuthenticationService.verifyPin(pin);
-        if (isValid) {
-            if (pendingAction?.type === 'delete' && pendingAction.id) {
-                confirmDelete(pendingAction.id);
-            } else if (pendingAction?.type === 'load') {
-                presenter.loadNotes();
+    const handleAddNewNote = () => {
+        // Set up for a new note, require authentication first
+        setSelectedNote(null);
+        setShowSecurityScreen(true);
+    };
+
+    const handleAuthenticated = () => {
+        // User has been authenticated, proceed with operation
+        setShowSecurityScreen(false);
+        
+        if (pendingDeleteNoteId !== null) {
+            // Handle delete operation
+            presenter.deleteNote(pendingDeleteNoteId);
+            setPendingDeleteNoteId(null);
+        } else if (pendingViewNoteId !== null) {
+            // Handle view operation - find the note and display it
+            const noteToView = notes.find(note => note.id === pendingViewNoteId);
+            if (noteToView) {
+                setSelectedNote(noteToView);
+                setAddScreenVisible(true);
             }
-            setShowPinModal(false);
-            setPin('');
-            setPendingAction(null);
+            setPendingViewNoteId(null);
         } else {
-            Alert.alert('Invalid PIN', 'Please try again');
-            setPin('');
+            // If no pending operations, it means we're authenticating for initial load
+            // or for adding a new note
+            presenter.loadNotes();
+            
+            // If we intended to add a new note, open the screen
+            if (selectedNote === null && !pendingDeleteNoteId && !pendingViewNoteId) {
+                setAddScreenVisible(true);
+            }
         }
     };
 
@@ -119,6 +143,7 @@ const NoteList: React.FC = () => {
                 renderItem={({ item }) => (
                     <TouchableOpacity
                         style={styles.noteItem}
+                        onPress={() => handleNotePress(item)}
                         onLongPress={() => handleDeleteNote(item.id!)}
                     >
                         <Text style={styles.noteTitle}>{item.title}</Text>
@@ -131,7 +156,7 @@ const NoteList: React.FC = () => {
 
             <TouchableOpacity 
                 style={styles.addButton} 
-                onPress={() => setAddScreenVisible(true)}
+                onPress={handleAddNewNote}
             >
                 <Image 
                     source={require('../assets/icons/add.png')}
@@ -142,11 +167,22 @@ const NoteList: React.FC = () => {
 
             <AddNoteScreen
                 visible={addScreenVisible}
-                onClose={() => setAddScreenVisible(false)}
-                onSave={async (title, content) => {
+                onClose={() => {
+                    setAddScreenVisible(false);
+                    setSelectedNote(null); // Clear selected note on close
+                }}
+                note={selectedNote}
+                onSave={async (title, content, noteId) => {
                     try {
-                        await presenter.addNote(title, content);
+                        if (noteId) {
+                            // If noteId exists, we're editing an existing note
+                            await presenter.updateNote(noteId, title, content);
+                        } else {
+                            // Otherwise, we're adding a new note
+                            await presenter.addNote(title, content);
+                        }
                         setAddScreenVisible(false);
+                        setSelectedNote(null);
                     } catch {
                         Alert.alert('Error', 'Failed to save note');
                     }
@@ -154,30 +190,11 @@ const NoteList: React.FC = () => {
             />
 
             <Modal
-                visible={showPinModal}
-                transparent={true}
+                visible={showSecurityScreen}
                 animationType="fade"
+                transparent={false}
             >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Enter PIN</Text>
-                        <TextInput
-                            style={styles.pinInput}
-                            value={pin}
-                            onChangeText={setPin}
-                            keyboardType="numeric"
-                            maxLength={6}
-                            secureTextEntry
-                            placeholder="Enter your 6-digit PIN"
-                        />
-                        <TouchableOpacity
-                            style={styles.submitButton}
-                            onPress={handlePinSubmit}
-                        >
-                            <Text style={styles.submitButtonText}>Submit</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                <SecurityScreen onAuthenticated={handleAuthenticated} />
             </Modal>
         </View>
     );
@@ -202,7 +219,7 @@ const styles = StyleSheet.create({
     },
     logoIcon: {
         width: 35,
-        height: 35 ,
+        height: 35,
         marginRight: 10,
     },
     headerTitle: {

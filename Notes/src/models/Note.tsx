@@ -1,4 +1,3 @@
-
 export interface Note {
     id?: number;
     title: string;
@@ -7,7 +6,16 @@ export interface Note {
     updatedAt?: string;
 }
 
-export interface EncryptedNote extends Note {
+export interface EncryptedNoteData {
+    cipher: string;
     iv: string;
     salt: string;
+}
+
+export interface EncryptedNote {
+    id?: number;
+    title: EncryptedNoteData;
+    content: EncryptedNoteData;
+    createdAt: string;
+    updatedAt?: string;
 }

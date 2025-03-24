@@ -1,6 +1,7 @@
 import { open } from 'react-native-quick-sqlite';
-import { Note } from '../models/Note';
+import { Note, EncryptedNote } from '../models/Note';
 import { Platform } from 'react-native';
+import EncryptionService from './EncryptionService';
 
 class DatabaseService {
     private static dbInstance: any = null;
@@ -24,7 +25,7 @@ class DatabaseService {
                 return this.dbInstance;
             } catch (error) {
                 console.error('Database creation failed:', error);
-                throw new Error('Failed to create database: ' + error);
+                throw new Error('Failed to create database');
             }
         }
         return this.dbInstance;
@@ -38,8 +39,12 @@ class DatabaseService {
             await db.executeAsync(`
                 CREATE TABLE IF NOT EXISTS notes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    content TEXT NOT NULL,
+                    title_cipher TEXT NOT NULL,
+                    title_iv TEXT NOT NULL,
+                    title_salt TEXT NOT NULL,
+                    content_cipher TEXT NOT NULL,
+                    content_iv TEXT NOT NULL,
+                    content_salt TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -57,13 +62,25 @@ class DatabaseService {
         const now = new Date().toISOString();
 
         try {
+            // Encrypt title and content
+            const encryptedTitle = await EncryptionService.encryptData(title);
+            const encryptedContent = await EncryptionService.encryptData(content);
+
             await db.executeAsync(
-                'INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, ?, ?, ?)',
-                [title, content, now, now]
+                `INSERT INTO notes (
+                    title_cipher, title_iv, title_salt,
+                    content_cipher, content_iv, content_salt,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    encryptedTitle.cipher, encryptedTitle.iv, encryptedTitle.salt,
+                    encryptedContent.cipher, encryptedContent.iv, encryptedContent.salt,
+                    now, now
+                ]
             );
             console.log('Note added successfully');
         } catch (error) {
-            console.error('Failed to add note:', error);
+            console.error('Failed to add encrypted note:', error);
             throw error;
         }
     }
@@ -78,13 +95,34 @@ class DatabaseService {
 
             if (!result?.rows?._array) return [];
 
-            return result.rows._array.map((row: any) => ({
-                id: row.id,
-                title: row.title,
-                content: row.content,
-                createdAt: row.created_at,
-                updatedAt: row.updated_at
-            }));
+            const notes: Note[] = [];
+            for (const row of result.rows._array) {
+                try {
+                    const decryptedTitle = await EncryptionService.decryptData(
+                        row.title_cipher,
+                        row.title_iv,
+                        row.title_salt
+                    );
+                    const decryptedContent = await EncryptionService.decryptData(
+                        row.content_cipher,
+                        row.content_iv,
+                        row.content_salt
+                    );
+
+                    notes.push({
+                        id: row.id,
+                        title: decryptedTitle,
+                        content: decryptedContent,
+                        createdAt: row.created_at,
+                        updatedAt: row.updated_at
+                    });
+                } catch (error) {
+                    console.error(`Failed to decrypt note ${row.id}:`, error);
+                    // Skip corrupted notes but continue processing others
+                    continue;
+                }
+            }
+            return notes;
         } catch (error) {
             console.error('Failed to get notes:', error);
             throw error;
@@ -103,29 +141,28 @@ class DatabaseService {
     }
 
     public static async updateNote(id: number, title: string, content: string): Promise<void> {
+        const db = await this.getDatabaseInstance();
+        const now = new Date().toISOString();
+
         try {
-            console.log(`DatabaseService updating note ID: ${id}`);
-            const db = await this.getDatabaseInstance();
-            const now = new Date().toISOString();
-            
-            // Log the SQL and parameters for debugging
-            console.log('Update SQL:', 'UPDATE notes SET title = ?, content = ?, updated_at = ? WHERE id = ?');
-            console.log('Parameters:', [title, content, now, id]);
-            
-            const result = await db.executeAsync(
-                'UPDATE notes SET title = ?, content = ?, updated_at = ? WHERE id = ?',
-                [title, content, now, id]
+            const encryptedTitle = await EncryptionService.encryptData(title);
+            const encryptedContent = await EncryptionService.encryptData(content);
+
+            await db.executeAsync(
+                `UPDATE notes SET 
+                    title_cipher = ?, title_iv = ?, title_salt = ?,
+                    content_cipher = ?, content_iv = ?, content_salt = ?,
+                    updated_at = ?
+                WHERE id = ?`,
+                [
+                    encryptedTitle.cipher, encryptedTitle.iv, encryptedTitle.salt,
+                    encryptedContent.cipher, encryptedContent.iv, encryptedContent.salt,
+                    now, id
+                ]
             );
-            
-            // Check if any rows were actually updated
-            console.log('Update result:', result);
-            if (result && result.rowsAffected === 0) {
-                console.warn('No rows were updated. Note might not exist with ID:', id);
-            } else {
-                console.log(`Note ID ${id} updated successfully`);
-            }
+            console.log(`Note ID ${id} updated successfully`);
         } catch (error) {
-            console.error('Error updating note:', error);
+            console.error('Failed to update encrypted note:', error);
             throw error;
         }
     }

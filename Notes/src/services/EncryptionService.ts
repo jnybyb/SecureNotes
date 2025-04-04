@@ -1,10 +1,13 @@
 import Aes from 'react-native-aes-crypto';
 import * as Keychain from 'react-native-keychain';
 
+// Service for handling data encryption and key management
 export default class EncryptionService {
+
     private static readonly DB_KEY_ID = 'secure_notes_db_key';
     private static readonly NOTE_KEY_ID = 'secure_notes_content_key';
 
+    // Retrieves or generates the database encryption key
     public static async getDatabaseKey(): Promise<string> {
         try {
             const credentials = await Keychain.getGenericPassword({
@@ -31,6 +34,7 @@ export default class EncryptionService {
         }
     }
 
+    // Retrieves or generates the note content encryption key
     private static async getEncryptionKey(): Promise<string> {
         try {
             const credentials = await Keychain.getGenericPassword({
@@ -56,6 +60,7 @@ export default class EncryptionService {
         }
     }
 
+    // Encrypts data using AES-256-CBC with random IV and salt
     public static async encryptData(data: string): Promise<{ cipher: string; iv: string; salt: string }> {
         try {
             const salt = await Aes.randomKey(16);
@@ -70,6 +75,7 @@ export default class EncryptionService {
         }
     }
 
+    // Decrypts data using stored encryption key and provided IV/salt
     public static async decryptData(cipher: string, iv: string, salt: string): Promise<string> {
         try {
             const key = await this.getEncryptionKey();

@@ -4,9 +4,12 @@ import { Platform } from 'react-native';
 import EncryptionService from './EncryptionService';
 
 class DatabaseService {
+    // Database connection instance
     private static dbInstance: any = null;
+    // Database file name
     private static readonly DB_NAME = 'notes.db';
 
+    // Gets or creates a database connection
     static async getDatabaseInstance() {
         if (!this.dbInstance) {
             try {
@@ -31,6 +34,7 @@ class DatabaseService {
         return this.dbInstance;
     }
 
+    // Sets up the initial database structure
     private static async initializeDatabase() {
         try {
             const db = this.dbInstance;
@@ -57,6 +61,7 @@ class DatabaseService {
         }
     }
 
+    // Saves a new note with encrypted title and content
     public static async addNote(title: string, content: string): Promise<void> {
         const db = await this.getDatabaseInstance();
         const now = new Date().toISOString();
@@ -85,6 +90,7 @@ class DatabaseService {
         }
     }
 
+    // Fetches and decrypts all notes from the database
     public static async getNotes(): Promise<Note[]> {
         const db = await this.getDatabaseInstance();
         try {
@@ -129,6 +135,7 @@ class DatabaseService {
         }
     }
 
+    // Removes a note by its ID
     public static async deleteNote(id: number): Promise<void> {
         const db = await this.getDatabaseInstance();
         try {
@@ -140,6 +147,7 @@ class DatabaseService {
         }
     }
 
+    // Updates an existing note with new encrypted data
     public static async updateNote(id: number, title: string, content: string): Promise<void> {
         const db = await this.getDatabaseInstance();
         const now = new Date().toISOString();
@@ -167,6 +175,7 @@ class DatabaseService {
         }
     }
     
+    // Closes the active database connection
     public static async closeDatabase(): Promise<void> {
         if (this.dbInstance) {
             try {

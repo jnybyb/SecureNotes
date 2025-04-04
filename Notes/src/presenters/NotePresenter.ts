@@ -1,19 +1,23 @@
 import DatabaseService from '../services/DatabaseService';
 import { Note } from '../models/Note';
 
+// Interface defining callback functions for note operations
 interface NotePresenterCallbacks {
     onNotesLoaded: (notes: Note[]) => void;
     onNoteDeleted: (id: number) => void;
     onError: (error: string) => void;
 }
 
+// Handles business logic for note operations
 class NotePresenter {
     private callbacks: NotePresenterCallbacks;
 
+    // Initializes presenter with UI callbacks
     constructor(callbacks: NotePresenterCallbacks) {
         this.callbacks = callbacks;
     }
 
+    // Fetches all notes and triggers callback
     public async loadNotes(): Promise<void> {
         try {
             const notes = await DatabaseService.getNotes();
@@ -23,6 +27,7 @@ class NotePresenter {
         }
     }
 
+    // Creates a new note and refreshes the list
     public async addNote(title: string, content: string): Promise<void> {
         try {
             await DatabaseService.addNote(title, content);
@@ -32,6 +37,7 @@ class NotePresenter {
         }
     }
 
+    // Removes a note and triggers callback
     public async deleteNote(id: number): Promise<void> {
         try {
             await DatabaseService.deleteNote(id);
@@ -41,6 +47,7 @@ class NotePresenter {
         }
     }
 
+    // Updates existing note and refreshes the list
     public async updateNote(id: number, title: string, content: string): Promise<void> {
         console.log(`Starting update for note ID: ${id}`);
         console.log(`Title: "${title}", Content length: ${content.length}`);

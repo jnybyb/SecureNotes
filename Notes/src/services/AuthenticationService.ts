@@ -1,8 +1,11 @@
 import * as Keychain from 'react-native-keychain';
 
+// Service for handling PIN-based authentication
 export class AuthenticationService {
+    // Keychain service identifier for PIN storage
     private static readonly PIN_SERVICE = 'secure_notes_pin';
 
+    // Checks if a PIN has been set up
     static async authenticate(): Promise<boolean> {
         try {
             const credentials = await Keychain.getGenericPassword({
@@ -15,6 +18,7 @@ export class AuthenticationService {
         }
     }
 
+    // Validates the provided PIN against stored PIN
     static async verifyPin(pin: string): Promise<boolean> {
         try {
             const credentials = await Keychain.getGenericPassword({
